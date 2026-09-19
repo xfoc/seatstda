@@ -244,7 +244,7 @@
       const [selectedSeats, setSelectedSeats] = useState([]);
 
       const seatGridRef = useRef(null);
-      const fileInputRef = useRef(null); // 用於觸發檔案選擇器
+      const fileInputRef = useRef(null);
 
       useEffect(() => {
         let unsubClasses = null;
@@ -255,7 +255,6 @@
           try {
             // ==========================================
             // 請將下方的 firebaseConfig 替換成您自己的設定！
-            // 只要在這裡貼上一次，部署上 Vercel 後所有設備就都能自動同步了！
             // ==========================================
             const firebaseConfig = {
               apiKey: "AIzaSyCavJtceAMrHgr88aZLL_PdgyBMJXWHtgk",
@@ -277,18 +276,17 @@
                  return;
             }
 
-            const envAppId = 'my-cram-school-advanced'; 
             const FB = window.FirebaseAPI;
             const app = FB.initializeApp(firebaseConfig);
             const auth = FB.getAuth(app);
             const db = FB.getFirestore(app);
 
             window.dbInstance = db;
-            window.cloudAppId = envAppId;
 
             await FB.signInAnonymously(auth);
 
-            const usersRef = FB.doc(db, 'artifacts', envAppId, 'public', 'data', 'settings', 'users');
+            // 修改讀取設定的路徑，為了避免與您的 classes 衝突，將設定放在 settings 集合
+            const usersRef = FB.doc(db, 'settings', 'users');
             unsubUsers = FB.onSnapshot(usersRef, (docSnap) => {
               if (!docSnap.exists()) {
                 FB.setDoc(usersRef, DEFAULT_USERS);
@@ -298,7 +296,7 @@
               }
             }, e => console.error("Users Sync Error", e));
 
-            const structRef = FB.doc(db, 'artifacts', envAppId, 'public', 'data', 'settings', 'structure');
+            const structRef = FB.doc(db, 'settings', 'structure');
             unsubStructure = FB.onSnapshot(structRef, (docSnap) => {
               if (!docSnap.exists()) {
                 FB.setDoc(structRef, DEFAULT_STRUCTURE);
@@ -308,14 +306,15 @@
               }
             }, e => console.error("Structure Sync Error", e));
 
-            const classesRef = FB.collection(db, 'artifacts', envAppId, 'public', 'data', 'classes');
+            // 修改讀取資料的路徑為根目錄的 classes 集合，以符合您 Firebase 上的現有資料
+            const classesRef = FB.collection(db, 'classes');
             unsubClasses = FB.onSnapshot(classesRef, (snapshot) => {
               if (snapshot.empty) {
                 setTimeout(() => {
                    const initialData = generateMockData(DEFAULT_STRUCTURE);
                    setDbState(initialData); 
                    Object.entries(initialData).forEach(async ([clsName, seats]) => {
-                     const docRef = FB.doc(db, 'artifacts', envAppId, 'public', 'data', 'classes', clsName);
+                     const docRef = FB.doc(db, 'classes', clsName);
                      await FB.setDoc(docRef, seats);
                    });
                 }, 1000);
@@ -433,10 +432,10 @@
           return newDb;
         });
 
-        // 寫入雲端
+        // 修改寫入雲端資料的路徑為根目錄的 classes 集合
         if (syncState === 'synced' && window.dbInstance && window.FirebaseAPI) {
           const FB = window.FirebaseAPI;
-          const classDocRef = FB.doc(window.dbInstance, 'artifacts', window.cloudAppId, 'public', 'data', 'classes', selectedClass);
+          const classDocRef = FB.doc(window.dbInstance, 'classes', selectedClass);
           try {
             await FB.setDoc(classDocRef, updates, { merge: true });
           } catch (e) {
@@ -491,9 +490,10 @@
       };
 
       const saveSettingsToCloud = async (type, data) => {
+        // 修改寫入設定的路徑為 settings 集合
         if (syncState === 'synced' && window.dbInstance && window.FirebaseAPI) {
            const FB = window.FirebaseAPI;
-           const docRef = FB.doc(window.dbInstance, 'artifacts', window.cloudAppId, 'public', 'data', 'settings', type);
+           const docRef = FB.doc(window.dbInstance, 'settings', type);
            await FB.setDoc(docRef, data);
         }
       };
@@ -573,10 +573,10 @@
                 return newDb;
               });
 
-              // 寫入雲端
+              // 修改寫入雲端資料的路徑為根目錄的 classes 集合
               if (syncState === 'synced' && window.dbInstance && window.FirebaseAPI) {
                 const FB = window.FirebaseAPI;
-                const classDocRef = FB.doc(window.dbInstance, 'artifacts', window.cloudAppId, 'public', 'data', 'classes', selectedClass);
+                const classDocRef = FB.doc(window.dbInstance, 'classes', selectedClass);
                 await FB.setDoc(classDocRef, updates, { merge: true });
               }
               showToast(`成功匯入 ${validCount} 筆座位資料！`);
